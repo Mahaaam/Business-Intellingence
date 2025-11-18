@@ -1,8 +1,9 @@
-import React, { useContext, useState, useMemo } from 'react';
+import React, { useContext, useState, useMemo, useEffect, useRef } from 'react';
 import { AppContext } from './App';
 import type { AppContextType } from './types';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ChevronUp, ChevronDown, Menu, X, Globe, Briefcase, DollarSign, Settings, Droplet, CheckSquare, Users, Truck, ShoppingCart, BrainCircuit, Activity, Wrench, ShieldAlert, BadgeCheck, FlaskConical, HardHat, Warehouse, Package, Target, TrendingUp, Wallet } from 'lucide-react';
+import { ChevronUp, ChevronDown, Menu, X, Globe, Briefcase, DollarSign, Settings, Droplet, CheckSquare, Users, Truck, ShoppingCart, BrainCircuit, Activity, Wrench, ShieldAlert, BadgeCheck, FlaskConical, HardHat, Warehouse, Package, Target, TrendingUp, Wallet, GripVertical, Bot, Send, Loader2 } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
 
 // --- Reusable Components ---
 
@@ -52,16 +53,21 @@ export const ChartCard: React.FC<{ title: string; children: React.ReactNode }> =
   </div>
 );
 
-const CustomTooltip = ({ active, payload, label, unit }: any) => {
+export const CustomTooltip = ({ active, payload, label, unit }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-slate-900/60 backdrop-blur-md p-3 rounded-lg border border-blue-500/30">
         <p className="label text-blue-300">{`${label}`}</p>
-        {payload.map((pld: any) => (
-          <p key={pld.dataKey} style={{ color: pld.color }}>
-            {`${pld.name}: ${pld.value.toLocaleString()}${unit ? ` ${unit}` : ''}`}
-          </p>
-        ))}
+        {payload.map((pld: any) => {
+          if (pld.value != null) {
+            return (
+              <p key={pld.dataKey} style={{ color: pld.color }}>
+                {`${pld.name}: ${pld.value.toLocaleString()}${unit ? ` ${unit}` : ''}`}
+              </p>
+            );
+          }
+          return null;
+        })}
       </div>
     );
   }
@@ -273,5 +279,246 @@ export const FilterControls: React.FC<{ onFilterChange: (filters: any) => void }
                 ))}
             </div>
         </div>
+    );
+};
+
+export const KpiCustomizationModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  allKpis: { [key: string]: { id: string; title: string; } };
+  visibleIds: string[];
+  onSave: (newIds: string[]) => void;
+  language: 'fa' | 'en';
+}> = ({ isOpen, onClose, allKpis, visibleIds, onSave, language }) => {
+  type KpiConfigItem = { id: string; title: string; isVisible: boolean };
+  const [kpiConfig, setKpiConfig] = useState<KpiConfigItem[]>([]);
+  const draggedItem = React.useRef<number | null>(null);
+  const dragOverItem = React.useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      // FIX: Safely map visibleIds to KPI objects, preventing crashes if an ID doesn't exist in allKpis.
+      const orderedVisible = visibleIds
+        .map(id => allKpis[id])
+        .filter(kpi => !!kpi) // Filter out undefined KPIs
+        .map(kpi => ({ ...kpi!, isVisible: true }));
+
+      // FIX: Safely filter hidden KPIs, ensuring kpi object exists before accessing its properties.
+      const hidden = Object.values(allKpis)
+        .filter(kpi => kpi && !visibleIds.includes(kpi.id))
+        .map(kpi => ({ ...kpi, isVisible: false }));
+      setKpiConfig([...orderedVisible, ...hidden]);
+    }
+  }, [isOpen, allKpis, visibleIds]);
+
+  const handleSave = () => {
+    const newVisibleIds = kpiConfig.filter(k => k.isVisible).map(k => k.id);
+    onSave(newVisibleIds);
+    onClose();
+  };
+  
+  const handleToggleVisibility = (id: string) => {
+    setKpiConfig(prev => prev.map(k => k.id === id ? { ...k, isVisible: !k.isVisible } : k));
+  };
+
+  const handleDragSort = () => {
+    if (draggedItem.current === null || dragOverItem.current === null) return;
+    const kpiConfigClone = [...kpiConfig];
+    const dragged = kpiConfigClone.splice(draggedItem.current, 1)[0];
+    kpiConfigClone.splice(dragOverItem.current, 0, dragged);
+    draggedItem.current = null;
+    dragOverItem.current = null;
+    setKpiConfig(kpiConfigClone);
+  };
+  
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-slate-900/80 border border-[--brand-red-base]/30 rounded-2xl shadow-2xl shadow-red-900/30 w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-[--brand-red-bright]">
+            {language === 'fa' ? 'سفارشی‌سازی KPIها' : 'Customize KPIs'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24} /></button>
+        </div>
+        <p className="text-gray-400 mb-6">{language === 'fa' ? 'KPIهای مورد نظر را انتخاب و ترتیب آن‌ها را مشخص کنید.' : 'Select KPIs to display and drag to reorder.'}</p>
+        
+        <div className="space-y-3">
+          {kpiConfig.map((kpi, index) => (
+            <div 
+              key={kpi.id}
+              className={`flex items-center p-3 rounded-lg transition-all duration-200 cursor-grab ${kpi.isVisible ? 'bg-slate-800' : 'bg-slate-800/50'}`}
+              draggable
+              onDragStart={() => draggedItem.current = index}
+              onDragEnter={() => dragOverItem.current = index}
+              onDragEnd={handleDragSort}
+              onDragOver={e => e.preventDefault()}
+            >
+              <GripVertical className="text-gray-500 mr-3" />
+              <input
+                type="checkbox"
+                checked={kpi.isVisible}
+                onChange={() => handleToggleVisibility(kpi.id)}
+                className="w-5 h-5 rounded bg-slate-700 border-slate-600 text-[--brand-red-base] focus:ring-[--brand-red-base] cursor-pointer"
+              />
+              <span className={`flex-1 mx-4 ${kpi.isVisible ? 'text-white' : 'text-gray-500'}`}>{kpi.title}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-8 flex justify-end gap-4">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+            {language === 'fa' ? 'انصراف' : 'Cancel'}
+          </button>
+          <button onClick={handleSave} className="px-4 py-2 rounded-lg bg-[--brand-red-base] hover:bg-[--brand-red-bright] text-white font-semibold transition-colors shadow-[0_0_10px_var(--brand-red-base)]">
+            {language === 'fa' ? 'ذخیره' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- AI Chat Assistant ---
+
+type Message = {
+  role: 'user' | 'model';
+  text: string;
+};
+
+export const AIChatAssistant: React.FC = () => {
+    const { mockData, language } = useContext(AppContext) as AppContextType;
+    const [isOpen, setIsOpen] = useState(false);
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [userInput, setUserInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        setMessages([{
+            role: 'model',
+            text: language === 'fa' ? 'سلام! من دستیار هوش مصنوعی شما هستم. چگونه می‌توانم در تحلیل داده‌ها به شما کمک کنم؟' : 'Hello! I am your AI assistant. How can I help you analyze the data today?'
+        }]);
+    }, [language]);
+
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!userInput.trim() || isLoading) return;
+
+        const newUserMessage: Message = { role: 'user', text: userInput };
+        setMessages(prev => [...prev, newUserMessage]);
+        const currentInput = userInput;
+        setUserInput('');
+        setIsLoading(true);
+
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            
+            const dataSummary = `
+              You are a helpful BI analyst for TOMM GROUP. Your task is to answer questions based on the provided data summary. Keep your answers concise and professional. If you cannot answer with the provided summary, state that you need more specific data.
+              Data Summary:
+              - We have 4 factories: ${mockData.factories.map(f => `${f.name} (${f.type})`).join(', ')}.
+              - We produce: ${mockData.products.map(p => p.name).join(', ')}.
+              - The dataset covers the last 365 days.
+              - Available data points include: Production (planned, actual, OEE), Finance (revenue, cost, profit), Energy (consumption), Maintenance (downtime), Quality (rejection rates), HR (employee count), Supply Chain (inventory), Sales (units sold).
+            `;
+            
+            const contents = `${dataSummary}\n\nUser Question: ${currentInput}`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-pro',
+                contents: contents,
+            });
+
+            const aiResponse: Message = { role: 'model', text: response.text };
+            setMessages(prev => [...prev, aiResponse]);
+
+        } catch (error) {
+            console.error("Error calling Gemini API:", error);
+            const errorMessage: Message = { role: 'model', text: language === 'fa' ? 'متاسفانه خطایی در ارتباط با سرویس هوش مصنوعی رخ داد. لطفا دوباره تلاش کنید.' : 'Sorry, an error occurred while contacting the AI service. Please try again.' };
+            setMessages(prev => [...prev, errorMessage]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const chatModalClasses = `
+      fixed bottom-24 end-4 z-40
+      w-[calc(100%-2rem)] max-w-md h-[70vh] max-h-[600px]
+      flex flex-col
+      bg-slate-900/60 backdrop-blur-xl border border-[--brand-red-base]/30 rounded-2xl shadow-2xl shadow-red-900/50
+      transition-all duration-300 ease-in-out
+      ${isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'}
+    `;
+
+    return (
+        <>
+            <div className={chatModalClasses}>
+                <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-[--brand-red-base]/20">
+                    <h3 className="font-bold text-[--brand-red-bright] flex items-center gap-2">
+                        <BrainCircuit size={20} />
+                        {language === 'fa' ? 'دستیار هوش مصنوعی' : 'AI Assistant'}
+                    </h3>
+                    <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white transition-colors">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div ref={chatContainerRef} className="flex-1 p-4 space-y-4 overflow-y-auto">
+                    {messages.map((msg, index) => (
+                        <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            {msg.role === 'model' && <Bot className="w-6 h-6 flex-shrink-0 text-[--brand-red-base]" />}
+                            <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
+                                msg.role === 'user'
+                                ? 'bg-[--brand-red-base] text-white rounded-br-none'
+                                : 'bg-slate-800 text-gray-200 rounded-bl-none'
+                            }`}>
+                                <p style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
+                            </div>
+                        </div>
+                    ))}
+                    {isLoading && (
+                         <div className="flex items-end gap-2 justify-start">
+                            <Bot className="w-6 h-6 flex-shrink-0 text-[--brand-red-base]" />
+                            <div className="max-w-[80%] rounded-2xl px-4 py-2 text-sm bg-slate-800 text-gray-200 rounded-bl-none flex items-center">
+                                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                                <span>{language === 'fa' ? 'در حال پردازش...' : 'Thinking...'}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <form onSubmit={handleSendMessage} className="flex-shrink-0 p-4 border-t border-[--brand-red-base]/20">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            value={userInput}
+                            onChange={(e) => setUserInput(e.target.value)}
+                            placeholder={language === 'fa' ? 'سوال خود را بپرسید...' : 'Ask a question...'}
+                            className="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[--brand-red-base]"
+                            disabled={isLoading}
+                        />
+                        <button type="submit" disabled={isLoading} className="bg-[--brand-red-base] hover:bg-[--brand-red-bright] disabled:bg-slate-700 disabled:cursor-not-allowed text-white p-3 rounded-lg transition-colors shadow-[0_0_10px_var(--brand-red-base)]">
+                            <Send size={16} />
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="fixed bottom-6 end-6 z-50 w-14 h-14 bg-[--brand-red-base] text-white rounded-full flex items-center justify-center shadow-lg shadow-red-900/50 hover:bg-[--brand-red-bright] transition-all duration-300 ease-in-out transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-red-500/50"
+                aria-label={language === 'fa' ? 'باز کردن چت هوش مصنوعی' : 'Open AI Chat'}
+            >
+                {isOpen ? <X size={28} /> : <Bot size={28} />}
+            </button>
+        </>
     );
 };

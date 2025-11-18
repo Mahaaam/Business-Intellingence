@@ -1,3 +1,6 @@
+// FIX: Import ReactNode to be used in KpiData interface.
+import type { ReactNode } from 'react';
+
 export type Language = 'en' | 'fa';
 
 export interface Factory {
@@ -91,7 +94,8 @@ export interface KpiData {
     value: string;
     change: number;
     description: string;
-    icon: React.ReactNode;
+    // FIX: Use ReactNode type which was imported.
+    icon: ReactNode;
 }
 
 export interface MockData {

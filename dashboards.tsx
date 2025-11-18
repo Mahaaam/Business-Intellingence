@@ -3,33 +3,9 @@ import React, { useContext, useMemo, useState } from 'react';
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
 import { AppContext } from './App';
 import type { AppContextType, KpiData } from './types';
-import { KpiCard, ChartCard, BarChartComponent, LineChartComponent, PieChartComponent, FilterControls } from './components';
-import { Activity, DollarSign, Droplet, Wrench, ShieldAlert, BadgeCheck, FlaskConical, Users, HardHat, Warehouse, Truck, ShoppingCart, Target, TrendingUp, Wallet, BrainCircuit, Package } from 'lucide-react';
+import { KpiCard, ChartCard, BarChartComponent, LineChartComponent, PieChartComponent, FilterControls, KpiCustomizationModal, CustomTooltip } from './components';
+import { Activity, DollarSign, Droplet, Wrench, ShieldAlert, BadgeCheck, FlaskConical, Users, HardHat, Warehouse, Truck, ShoppingCart, Target, TrendingUp, Wallet, BrainCircuit, Package, Edit } from 'lucide-react';
 import { CUSTOMERS } from './data';
-
-// FIX: Define CustomTooltip locally for AiDashboard chart, as it is not exported from components.tsx.
-// Also added a null check for value to prevent crashes when hovering over data gaps.
-const CustomTooltip = ({ active, payload, label, unit }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-slate-900/60 backdrop-blur-md p-3 rounded-lg border border-blue-500/30">
-        <p className="label text-blue-300">{`${label}`}</p>
-        {payload.map((pld: any) => {
-          if (pld.value != null) {
-            return (
-              <p key={pld.dataKey} style={{ color: pld.color }}>
-                {`${pld.name}: ${pld.value.toLocaleString()}${unit ? ` ${unit}` : ''}`}
-              </p>
-            );
-          }
-          return null;
-        })}
-      </div>
-    );
-  }
-  return null;
-};
-
 
 const DashboardTitle: React.FC<{ title: string, subtitle: string }> = ({ title, subtitle }) => (
     <div className="mb-8">
@@ -147,18 +123,38 @@ export const FinanceDashboard: React.FC = () => {
     const { language, mockData } = useContext(AppContext) as AppContextType;
     const { finance, factories } = mockData;
     const [selectedFactory, setSelectedFactory] = useState<null | { id: number; name: string }>(null);
+    const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+    const [visibleKpiIds, setVisibleKpiIds] = useState<string[]>(['revenue', 'cogs', 'profit', 'margin']);
 
-    const totalRevenue = useMemo(() => finance.reduce((sum, item) => sum + item.revenue, 0), [finance]);
-    const totalCogs = useMemo(() => finance.reduce((sum, item) => sum + item.costOfGoods, 0), [finance]);
-    const totalProfit = useMemo(() => finance.reduce((sum, item) => sum + item.netProfit, 0), [finance]);
-    const grossMargin = useMemo(() => totalRevenue > 0 ? ((totalRevenue - totalCogs) / totalRevenue * 100).toFixed(1) : '0', [totalRevenue, totalCogs]);
+    const allFinancialKpis = useMemo(() => {
+        const totalRevenue = finance.reduce((sum, item) => sum + item.revenue, 0);
+        const totalCogs = finance.reduce((sum, item) => sum + item.costOfGoods, 0);
+        const totalProfit = finance.reduce((sum, item) => sum + item.netProfit, 0);
+        const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCogs) / totalRevenue * 100) : 0;
 
-    const kpis: KpiData[] = [
-        { title: language === 'fa' ? 'درآمد کل' : 'Total Revenue', value: `$${(totalRevenue / 1_000_000).toFixed(2)}M`, change: 8.1, description: language === 'fa' ? 'نسبت به سال قبل' : 'vs. last year', icon: <TrendingUp /> },
-        { title: language === 'fa' ? 'بهای تمام‌شده کالا' : 'Cost of Goods', value: `$${(totalCogs / 1_000_000).toFixed(2)}M`, change: 6.5, description: language === 'fa' ? 'نسبت به سال قبل' : 'vs. last year', icon: <Wallet /> },
-        { title: language === 'fa' ? 'سود خالص' : 'Net Profit', value: `$${(totalProfit / 1_000_000).toFixed(2)}M`, change: 12.5, description: language === 'fa' ? 'نسبت به سال قبل' : 'vs. last year', icon: <DollarSign /> },
-        { title: language === 'fa' ? 'حاشیه سود ناخالص' : 'Gross Margin', value: `${grossMargin}%`, change: 1.6, description: language === 'fa' ? 'نسبت به سال قبل' : 'vs. last year', icon: <TrendingUp /> },
-    ];
+        return {
+            revenue: {
+                id: 'revenue',
+                title: language === 'fa' ? 'درآمد کل' : 'Total Revenue',
+                data: { value: `$${(totalRevenue / 1_000_000).toFixed(2)}M`, change: 8.1, description: language === 'fa' ? 'نسبت به سال قبل' : 'vs. last year', icon: <TrendingUp /> }
+            },
+            cogs: {
+                id: 'cogs',
+                title: language === 'fa' ? 'بهای تمام‌شده کالا' : 'Cost of Goods',
+                data: { value: `$${(totalCogs / 1_000_000).toFixed(2)}M`, change: 6.5, description: language === 'fa' ? 'نسبت به سال قبل' : 'vs. last year', icon: <Wallet /> }
+            },
+            profit: {
+                id: 'profit',
+                title: language === 'fa' ? 'سود خالص' : 'Net Profit',
+                data: { value: `$${(totalProfit / 1_000_000).toFixed(2)}M`, change: 12.5, description: language === 'fa' ? 'نسبت به سال قبل' : 'vs. last year', icon: <DollarSign /> }
+            },
+            margin: {
+                id: 'margin',
+                title: language === 'fa' ? 'حاشیه سود ناخالص' : 'Gross Margin',
+                data: { value: `${grossMargin.toFixed(1)}%`, change: 1.6, description: language === 'fa' ? 'نسبت به سال قبل' : 'vs. last year', icon: <TrendingUp /> }
+            }
+        };
+    }, [finance, language]);
     
     const revenueByFactory = useMemo(() => {
         return factories.map(factory => ({
@@ -188,6 +184,7 @@ export const FinanceDashboard: React.FC = () => {
     }, [finance, mockData.products, factories, selectedFactory]);
 
     const costStructure = useMemo(() => {
+        const totalCogs = finance.reduce((sum, item) => sum + item.costOfGoods, 0);
         const totalProductionCost = totalCogs; // Simplified for demo
         return [
             { name: language === 'fa' ? 'مواد اولیه' : 'Raw Materials', value: totalProductionCost * 0.6 },
@@ -195,7 +192,7 @@ export const FinanceDashboard: React.FC = () => {
             { name: language === 'fa' ? 'نیروی انسانی' : 'Labor', value: totalProductionCost * 0.15 },
             { name: language === 'fa' ? 'سربار' : 'Overhead', value: totalProductionCost * 0.05 },
         ];
-    }, [totalCogs, language]);
+    }, [finance, language]);
     
     const handleFactoryClick = (payload: any) => {
         if (payload && payload.id) {
@@ -209,10 +206,30 @@ export const FinanceDashboard: React.FC = () => {
 
     return (
         <div>
-            <DashboardTitle title={language === 'fa' ? 'داشبورد مالی و حسابداری' : 'Finance & Cost Dashboard'} subtitle={language === 'fa' ? 'تحلیل بهای تمام‌شده، سودآوری و عملکرد مالی' : 'Analysis of costs, profitability, and financial performance'} />
+            <div className="flex justify-between items-start">
+                <DashboardTitle title={language === 'fa' ? 'داشبورد مالی و حسابداری' : 'Finance & Cost Dashboard'} subtitle={language === 'fa' ? 'تحلیل بهای تمام‌شده، سودآوری و عملکرد مالی' : 'Analysis of costs, profitability, and financial performance'} />
+                <button onClick={() => setIsCustomizeModalOpen(true)} className="flex items-center gap-2 bg-slate-800/80 text-slate-300 hover:bg-[--brand-red-dark]/60 hover:text-white px-4 py-2 rounded-lg transition-colors -mt-4">
+                    <Edit size={16} />
+                    <span className="text-sm font-semibold">{language === 'fa' ? 'سفارشی‌سازی' : 'Customize'}</span>
+                </button>
+            </div>
+            
+            <KpiCustomizationModal
+                isOpen={isCustomizeModalOpen}
+                onClose={() => setIsCustomizeModalOpen(false)}
+                allKpis={Object.values(allFinancialKpis).reduce((acc, kpi) => ({ ...acc, [kpi.id]: { id: kpi.id, title: kpi.title } }), {})}
+                visibleIds={visibleKpiIds}
+                onSave={setVisibleKpiIds}
+                language={language}
+            />
+
             <FilterControls onFilterChange={() => {}} />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                 {kpis.map(kpi => <KpiCard key={kpi.title} {...kpi} />)}
+                 {visibleKpiIds.map(kpiId => {
+                    const kpi = allFinancialKpis[kpiId as keyof typeof allFinancialKpis];
+                    if (!kpi) return null;
+                    return <KpiCard key={kpi.id} title={kpi.title} {...kpi.data} />;
+                 })}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <ChartCard 
@@ -380,7 +397,7 @@ export const QualityDashboard: React.FC = () => {
     const rejectionByFactory = useMemo(() => {
         return factories.map(factory => {
             const factoryQuality = quality.filter(q => q.factoryId === factory.id);
-            const avgRejection = factoryQuality.reduce((sum, q) => sum + q.rejectionRate, 0) / factoryQuality.length;
+            const avgRejection = factoryQuality.length > 0 ? factoryQuality.reduce((sum, q) => sum + q.rejectionRate, 0) / factoryQuality.length : 0;
             return { name: factory.name, 'نرخ مردودی (%)': avgRejection.toFixed(2) };
         });
     }, [quality, factories]);
@@ -388,7 +405,7 @@ export const QualityDashboard: React.FC = () => {
     const cpkByFactory = useMemo(() => {
         return factories.map(factory => {
             const factoryQuality = quality.filter(q => q.factoryId === factory.id);
-            const avgCpk = factoryQuality.reduce((sum, q) => sum + q.cpkIndex, 0) / factoryQuality.length;
+            const avgCpk = factoryQuality.length > 0 ? factoryQuality.reduce((sum, q) => sum + q.cpkIndex, 0) / factoryQuality.length : 0;
             return { name: factory.name, 'شاخص Cpk': avgCpk.toFixed(2) };
         });
     }, [quality, factories]);
@@ -417,14 +434,14 @@ export const HrDashboard: React.FC = () => {
     const { hr, factories } = mockData;
     
     // Get latest data for each factory
-    const latestHrData = factories.map(f => {
+    const latestHrData = useMemo(() => factories.map(f => {
       const factoryData = hr.filter(h => h.factoryId === f.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       return factoryData[0];
-    }).filter(Boolean);
+    }).filter(Boolean), [hr, factories]);
 
 
     const totalEmployees = latestHrData.reduce((sum, item) => sum + item.employeeCount, 0);
-    const avgAbsenteeism = latestHrData.reduce((sum, item) => sum + item.absenteeismRate, 0) / latestHrData.length;
+    const avgAbsenteeism = latestHrData.length > 0 ? latestHrData.reduce((sum, item) => sum + item.absenteeismRate, 0) / latestHrData.length : 0;
     const totalIncidents = hr.reduce((sum, item) => sum + item.safetyIncidents, 0);
 
     const kpis: KpiData[] = [
@@ -471,14 +488,14 @@ export const SupplyChainDashboard: React.FC = () => {
     const { language, mockData } = useContext(AppContext) as AppContextType;
     const { supplyChain, factories } = mockData;
 
-    const latestSupplyData = factories.map(f => {
+    const latestSupplyData = useMemo(() => factories.map(f => {
       const factoryData = supplyChain.filter(s => s.factoryId === f.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       return factoryData[0];
-    }).filter(Boolean);
+    }).filter(Boolean), [supplyChain, factories]);
     
     const totalRawMaterial = latestSupplyData.reduce((sum, item) => sum + item.rawMaterialInventoryTon, 0);
     const totalFinishedGoods = latestSupplyData.reduce((sum, item) => sum + item.finishedGoodsInventoryTon, 0);
-    const avgOnTimeDelivery = latestSupplyData.reduce((sum, item) => sum + item.supplierOnTimeDeliveryRate, 0) / latestSupplyData.length;
+    const avgOnTimeDelivery = latestSupplyData.length > 0 ? latestSupplyData.reduce((sum, item) => sum + item.supplierOnTimeDeliveryRate, 0) / latestSupplyData.length : 0;
 
     const kpis: KpiData[] = [
         { title: language === 'fa' ? 'موجودی مواد اولیه (تن)' : 'Raw Material Inv. (Tons)', value: `${(totalRawMaterial / 1000).toFixed(1)}K`, change: -2.5, description: language === 'fa' ? 'مصرف ماهانه' : 'monthly consumption', icon: <Warehouse /> },
@@ -498,7 +515,7 @@ export const SupplyChainDashboard: React.FC = () => {
     const onTimeDeliveryByFactory = useMemo(() => {
         return factories.map(factory => {
             const factorySupply = supplyChain.filter(s => s.factoryId === factory.id);
-            const avgDelivery = factorySupply.reduce((sum, s) => sum + s.supplierOnTimeDeliveryRate, 0) / factorySupply.length;
+            const avgDelivery = factorySupply.length > 0 ? factorySupply.reduce((sum, s) => sum + s.supplierOnTimeDeliveryRate, 0) / factorySupply.length : 0;
             return { name: factory.name, 'نرخ تحویل به‌موقع (%)': avgDelivery.toFixed(1) };
         });
     }, [supplyChain, factories]);
@@ -595,10 +612,18 @@ export const AiDashboard: React.FC = () => {
     }, [historicalProduction, language]);
 
     const combinedData = useMemo(() => {
-        const combined = historicalProduction.map(h => ({ ...h, 'تولید پیش‌بینی': null }));
-        const lastHistorical = combined[combined.length - 1];
-        const forecastStart = { ...forecastedProduction[0], name: lastHistorical.name, 'تولید واقعی': null, 'تولید پیش‌بینی': lastHistorical['تولید واقعی'] };
-        return [...combined, ...forecastedProduction.slice(1)];
+        if (historicalProduction.length === 0) {
+            return forecastedProduction.map(f => ({ ...f, 'تولید واقعی': null }));
+        }
+
+        const historicalPart = historicalProduction.map(h => ({ ...h, 'تولید پیش‌بینی': null }));
+        
+        const lastHistoricalPoint = historicalPart[historicalPart.length - 1];
+        lastHistoricalPoint['تولید پیش‌بینی'] = lastHistoricalPoint['تولید واقعی'];
+
+        const forecastPart = forecastedProduction.map(f => ({ ...f, 'تولید واقعی': null }));
+
+        return [...historicalPart, ...forecastPart];
     }, [historicalProduction, forecastedProduction]);
 
 
@@ -614,8 +639,8 @@ export const AiDashboard: React.FC = () => {
                            <YAxis stroke="rgba(255,255,255,0.5)" />
                            <Tooltip content={<CustomTooltip />} />
                            <Legend />
-                           <Line type="monotone" dataKey="تولید واقعی" stroke="#3b82f6" strokeWidth={2} />
-                           <Line type="monotone" dataKey="تولید پیش‌بینی" stroke="#10b981" strokeWidth={2} strokeDasharray="5 5" />
+                           <Line type="monotone" dataKey="تولید واقعی" stroke="#3b82f6" strokeWidth={2} connectNulls />
+                           <Line type="monotone" dataKey="تولید پیش‌بینی" stroke="#10b981" strokeWidth={2} strokeDasharray="5 5" connectNulls />
                         </LineChart>
                     </ResponsiveContainer>
                 </ChartCard>

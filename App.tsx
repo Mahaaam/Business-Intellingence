@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Sidebar } from './components';
+import { Sidebar, AIChatAssistant } from './components';
 import { Header } from './components';
 import { 
   ExecutiveDashboard, ProductionDashboard, FinanceDashboard, MaintenanceDashboard, 
@@ -64,6 +64,7 @@ const App: React.FC = () => {
             {renderPage()}
           </main>
         </div>
+        <AIChatAssistant />
       </div>
     </AppContext.Provider>
   );
