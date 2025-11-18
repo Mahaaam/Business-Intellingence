@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-g" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TOMM BI Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --brand-red-bright: #FF0000;
+        --brand-red-base: #D60000;
+        --brand-red-dark: #BF0000;
+        --brand-red-darkest: #8C0000;
+      }
+      /* Custom scrollbar for a better dark-mode experience */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #020617; /* bg-slate-900 */
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--brand-red-base); /* #D60000 */
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--brand-red-bright); /* #FF0000 */
+      }
+      body {
+        background-image: radial-gradient(circle at top, rgba(255, 0, 0, 0.1), transparent 35%);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1"
+  }
+}
+</script>
+</head>
+  <body class="bg-black text-gray-100">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
